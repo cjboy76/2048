@@ -1,206 +1,18 @@
 <script lang="ts">
-import { defineComponent, reactive, ref } from "vue";
-
-type KeyupEvent = {
-  w: () => void;
-  s: () => void;
-  d: () => void;
-  a: () => void;
-};
-
-const colorSheet: Record<number, string> = {
-  2: "#eee4da",
-  4: "#eee4eb",
-  8: "#f26179",
-  16: "#f59563",
-  32: "#f67c5f",
-  64: "#f65e36",
-  128: "#edcf72",
-  256: "#edcc61",
-  512: "#9c0",
-  1024: "#3365a5",
-  2048: "#09c",
-};
-
-const directions = {
-  d: [1, 0],
-  a: [-1, 0],
-  w: [0, -1],
-  s: [0, 1],
-};
+import { defineComponent, onMounted } from "vue";
+import { PlayGame, colorSheet } from "@/composable/logic";
 
 export default defineComponent({
   setup() {
-    const gameStarted = ref(false);
-    const gameStatus = ref(false);
-    const boardWidth = 4;
-    const boardHeight = 4;
-    const gameBoard = reactive(
-      Array.from({ length: boardHeight }, (_, x) => {
-        return Array.from({ length: boardWidth }, (_, y) => {
-          return {
-            boxId: x + "" + y,
-            x,
-            y,
-            value: 0,
-            added: false,
-          };
-        });
-      })
-    );
-
-    const initGame = () => {
-      appendNewNumber();
-      appendNewNumber();
-      appendNewNumber();
-      gameStarted.value = true;
-    };
-
-    const restartGame = () => {
-      gameBoard.flat().forEach((_) => {
-        _.value = 0;
-        _.added = false;
+    const game = new PlayGame(4, 4);
+    onMounted(() => {
+      document.addEventListener("keyup", (e) => {
+        game.keyupHandler(e);
       });
-      initGame();
-    };
-
-    const randomPosition = () => {
-      return {
-        randomX: Math.floor(Math.random() * (boardHeight - 1)),
-        randomY: Math.floor(Math.random() * (boardWidth - 1)),
-      };
-    };
-
-    const randomNewValue = () => {
-      return Math.random() > 0.99 ? 4 : 2;
-    };
-
-    const appendNewNumber = () => {
-      let randomX = randomPosition().randomX;
-      let randomY = randomPosition().randomY;
-      while (gameBoard[randomX][randomY].value) {
-        randomX = randomPosition().randomX;
-        randomY = randomPosition().randomY;
-      }
-      gameBoard[randomX][randomY].value = randomNewValue();
-    };
-
-    const resetBoxes = () => {
-      gameBoard.flat().forEach((_) => {
-        _.added = false;
-      });
-    };
-
-    const getNextBox = (currentDirection: number[], x: number, y: number) => {
-      if (
-        x + currentDirection[0] > 3 ||
-        x + currentDirection[0] < 0 ||
-        y + currentDirection[1] < 0 ||
-        y + currentDirection[1] > 3
-      )
-        return false;
-      return gameBoard[x + currentDirection[0]][y + currentDirection[1]];
-    };
-
-    const updateGameBoard = (
-      currentDirection: number[],
-      x: number,
-      y: number
-    ) => {
-      let currentBox = gameBoard[x][y];
-      let nextBox = getNextBox(currentDirection, x, y);
-
-      while (nextBox && nextBox.value === 0) {
-        nextBox.value = currentBox.value;
-        currentBox.value = 0;
-        currentBox = nextBox;
-        nextBox = getNextBox(currentDirection, currentBox.x, currentBox.y);
-      }
-      if (
-        nextBox &&
-        currentBox.value === nextBox.value &&
-        !nextBox.added &&
-        !currentBox.added
-      ) {
-        nextBox.value = nextBox.value * 2;
-        nextBox.added = true;
-        currentBox.value = 0;
-        updateGameBoard(
-          currentDirection,
-          x + currentDirection[0],
-          y + currentDirection[1]
-        );
-        return;
-      }
-    };
-
-    const goingUp = () => {
-      for (let x = 0; x < boardWidth; x++) {
-        for (let y = 0; y < boardHeight; y++) {
-          updateGameBoard(directions["w"], x, y);
-        }
-      }
-    };
-    const goingDown = () => {
-      for (let x = 0; x < boardWidth; x++) {
-        for (let y = boardHeight - 1; y >= 0; y--) {
-          updateGameBoard(directions["s"], x, y);
-        }
-      }
-    };
-    const goingLeft = () => {
-      for (let x = 0; x < boardWidth; x++) {
-        for (let y = 0; y < boardHeight; y++) {
-          updateGameBoard(directions["a"], x, y);
-        }
-      }
-    };
-    const goingRight = () => {
-      for (let x = boardWidth - 1; x >= 0; x--) {
-        for (let y = 0; y < boardHeight; y++) {
-          updateGameBoard(directions["d"], x, y);
-        }
-      }
-    };
-
-    const endGame = () => {
-      return gameBoard.flat().every((_) => {
-        return _.value !== 0;
-      });
-    };
-
-    const keyupEvent: KeyupEvent = {
-      d: goingRight,
-      a: goingLeft,
-      w: goingUp,
-      s: goingDown,
-    };
-
-    document.addEventListener("keyup", (e) => {
-      if (e.key === "w") {
-        keyupEvent["w"]();
-      }
-      if (e.key === "s") {
-        keyupEvent["s"]();
-      }
-      if (e.key === "a") {
-        keyupEvent["a"]();
-      }
-      if (e.key === "d") {
-        keyupEvent["d"]();
-      }
-      resetBoxes();
-      appendNewNumber();
-      console.log(endGame());
-      gameStatus.value = endGame();
     });
-
     return {
-      gameBoard,
-      gameStarted,
       colorSheet,
-      initGame,
-      restartGame,
+      game,
     };
   },
 });
@@ -217,11 +29,10 @@ export default defineComponent({
   </div>
   <header>
     <h1 class="text-3xl font-bold underline">2048</h1>
-    
   </header>
 
   <div class="flex justify-center items-center py-10">
-    <div v-for="(col, i) in gameBoard" :key="i" class="w-20 h-20">
+    <div v-for="(col, i) in game.gameBoard" :key="i" class="w-20 h-20">
       <div>
         <div
           v-for="(box, j) in col"
@@ -241,14 +52,14 @@ export default defineComponent({
   <footer class="absolute bottom-1/4 left-0 w-full">
     <div class="flex justify-center mb-4">
       <button
-        @click="initGame"
-        :disabled="gameStarted"
+        @click="game.initGame"
+        :disabled="game.gameStarted.value"
         class="border-2 font-semibold border-neutral-700 text-neutral-700 px-2 py-1 rounded mx-1 disabled:opacity-75 disabled:border-gray-400 disabled:text-gray-400"
       >
         Start
       </button>
       <button
-        @click="restartGame"
+        @click="game.restartGame"
         class="border-2 font-semibold border-neutral-700 text-neutral-700 px-2 py-1 rounded mx-1 disabled:opacity-75"
       >
         Reset
